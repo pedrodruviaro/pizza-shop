@@ -12,7 +12,7 @@ export function AuthLayout() {
         <footer className="text-sm">Painel do parceiro &copy; pizza.shop - {new Date().getFullYear()}</footer>
       </div>
 
-      <main className="flex flex-col items-center justify-center">
+      <main className="flex flex-col items-center justify-center relative">
         <Outlet />
       </main>
     </div>
