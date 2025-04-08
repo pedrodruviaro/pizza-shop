@@ -1,9 +1,6 @@
-import { Button } from "@/components/ui/button"
+import { RouterProvider } from 'react-router-dom'
+import { router } from './routes'
 
 export function App() {
-  return (
-    <div className="flex gap-2 flex-col items-center justify-center min-h-svh">
-      <Button>Click me</Button>
-    </div>
-  )
+  return <RouterProvider router={router} />
 }
