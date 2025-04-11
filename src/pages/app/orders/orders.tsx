@@ -11,6 +11,10 @@ import { z } from 'zod'
 export function Orders() {
   const [searchParams, setSearchParmas] = useSearchParams()
 
+  const orderId = searchParams.get('orderId')
+  const customerName = searchParams.get('customerName')
+  const status = searchParams.get('status')
+
   // searchParams.get('page') ?? 0 if page starts with 1 is fine
   const pageIndex = z.coerce
     .number()
@@ -19,8 +23,10 @@ export function Orders() {
 
   const { data: result } = useQuery({
     // calls queryFn every time 'pageIndex' changes (not remake the fetch if the previous page is loaded. Uses from cache)
-    queryKey: ['orders', pageIndex],
-    queryFn: () => getOrders({ pageIndex }),
+    // queryKey: ['orders', pageIndex],
+
+    queryKey: ['orders', pageIndex, orderId, customerName, status],
+    queryFn: () => getOrders({ pageIndex, orderId, customerName, status: status === 'all' ? null : status }),
   })
 
   function handlePaginate(pageIndex: number) {
