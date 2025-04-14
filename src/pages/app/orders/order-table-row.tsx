@@ -10,6 +10,9 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cancelOrder } from '@/api/cancel-order'
 import { GetOrdersResponse } from '@/api/get-orders'
+import { ApproveOrder } from '@/api/approve-order'
+import { deliverOrder } from '@/api/deliver-order'
+import { dispatchOrder } from '@/api/dispatch-order'
 
 interface OrderTableRowProps {
   order: {
@@ -27,33 +30,61 @@ export function OrderTableRow({ order }: OrderTableRowProps) {
 
   const queryClient = useQueryClient()
 
-  const { mutateAsync: cancelOrderFn } = useMutation({
+  function updateOrderStatusOnCache(
+    orderId: string,
+    status: 'pending' | 'canceled' | 'processing' | 'delivering' | 'delivered',
+  ) {
+    // getQueriesData bc the list is paginates inside cache with prefix 'orders'
+    const cachedOrderList = queryClient.getQueriesData<GetOrdersResponse>({
+      queryKey: ['orders'],
+    })
+
+    cachedOrderList.forEach(([cacheKey, cacheData]) => {
+      if (!cacheData) return
+
+      queryClient.setQueryData<GetOrdersResponse>(cacheKey, {
+        ...cacheData,
+
+        // only updates the modified order
+        orders: cacheData.orders.map((order) => {
+          if (order.orderId === orderId) {
+            return {
+              ...order,
+              status,
+            }
+          }
+
+          return order
+        }),
+      })
+    })
+  }
+
+  const { mutateAsync: cancelOrderFn, isPending: isCancelingOrder } = useMutation({
     mutationFn: cancelOrder,
     async onSuccess(_, { orderId }) {
-      // getQueriesData bc the list is paginates inside cache with prefix 'orders'
-      const cachedOrderList = queryClient.getQueriesData<GetOrdersResponse>({
-        queryKey: ['orders'],
-      })
+      updateOrderStatusOnCache(orderId, 'canceled')
+    },
+  })
 
-      cachedOrderList.forEach(([cacheKey, cacheData]) => {
-        if (!cacheData) return
+  const { mutateAsync: approveOrderFn, isPending: isApprovingOrder } = useMutation({
+    mutationFn: ApproveOrder,
+    async onSuccess(_, { orderId }) {
+      updateOrderStatusOnCache(orderId, 'processing')
+    },
+  })
 
-        queryClient.setQueryData<GetOrdersResponse>(cacheKey, {
-          ...cacheData,
+  const { mutateAsync: dispatchOrderFn, isPending: isDispatchingOrder } = useMutation({
+    mutationFn: dispatchOrder,
+    async onSuccess(_, { orderId }) {
+      updateOrderStatusOnCache(orderId, 'delivering')
+    },
+  })
 
-          // only updates the modified order
-          orders: cacheData.orders.map((order) => {
-            if (order.orderId === orderId) {
-              return {
-                ...order,
-                status: 'canceled',
-              }
-            }
-
-            return order
-          }),
-        })
-      })
+  const { mutateAsync: deliverOrderFn, isPending: isDevliveringOrder } = useMutation({
+    mutationFn: deliverOrder,
+    async onSuccess(_, { orderId }) {
+      updateOrderStatusOnCache(orderId, 'delivered')
     },
   })
 
@@ -87,16 +118,47 @@ export function OrderTableRow({ order }: OrderTableRowProps) {
         })}
       </TableCell>
       <TableCell>
-        <Button variant="outline" size="xs">
-          <ArrowRight className="w-3 h-3" />
-          Aprovar
-        </Button>
+        {order.status === 'pending' && (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => approveOrderFn({ orderId: order.orderId })}
+            disabled={isApprovingOrder}
+          >
+            <ArrowRight className="w-3 h-3" />
+            Aprovar
+          </Button>
+        )}
+
+        {order.status === 'processing' && (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => dispatchOrderFn({ orderId: order.orderId })}
+            disabled={isDispatchingOrder}
+          >
+            <ArrowRight className="w-3 h-3" />
+            Em entrega
+          </Button>
+        )}
+
+        {order.status === 'delivering' && (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => deliverOrderFn({ orderId: order.orderId })}
+            disabled={isDevliveringOrder}
+          >
+            <ArrowRight className="w-3 h-3" />
+            Entregue
+          </Button>
+        )}
       </TableCell>
       <TableCell>
         <Button
           variant="ghost"
           size="xs"
-          disabled={!['pending', 'processing'].includes(order.status)}
+          disabled={!['pending', 'processing'].includes(order.status) || isCancelingOrder}
           onClick={() => cancelOrderFn({ orderId: order.orderId })}
         >
           <X className="w-3 h-3" />
